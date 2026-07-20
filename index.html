@@ -106,8 +106,10 @@
   .slot{padding:6px 12px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font-size:13px;
     font-weight:600;color:var(--ink);cursor:pointer;font-family:inherit;}
   .slot.on{background:var(--navy);border-color:var(--navy);color:#fff;}
-  .late3time{flex-basis:100%;display:flex;align-items:center;gap:6px;margin-top:2px;font-size:13px;color:var(--sub);}
-  .late3time input{width:auto;max-width:120px;padding:7px 10px;}
+  .t3row{flex-basis:100%;display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:3px;font-size:13px;}
+  .t3q{font-weight:600;color:var(--navy);}
+  .t3row input{width:auto;max-width:120px;padding:7px 10px;}
+  .t3after{color:var(--sub);}
   details.help{margin-top:10px;font-size:13px;}
   details.help summary{cursor:pointer;font-weight:600;color:var(--blue);}
   details.help ol{padding-left:18px;margin:8px 0;}
@@ -486,6 +488,8 @@ function renderMeSelect(){
     store.players.map(p=>`<option value="${p.name}"${p.name===me?" selected":""}>${p.name}</option>`).join("");
 }
 const SLOTS=[{k:"dawn",label:"새벽"},{k:"morning",label:"오전"},{k:"afternoon",label:"오후"},{k:"early3",label:"이른 3부"},{k:"late3",label:"늦은 3부"}];
+const TIME_SLOTS=["early3","late3"];            // '몇시부터' 시간 지정이 붙는 시간대
+const SLOT_DEFAULT={early3:"17:00", late3:"21:00"};
 const slotLabel=k=>(SLOTS.find(s=>s.k===k)||{}).label||k;
 const slotsOf=e=>!e||!e.slots?[]:(Array.isArray(e.slots)?e.slots:Object.values(e.slots)); // Firebase 배열 방어
 function renderMyAvail(){
@@ -503,24 +507,26 @@ function renderMyAvail(){
       `<div class="stbtns"><button class="stbtn no${isNo?" on":""}">불가</button>`+
       `<button class="stbtn ok${isOk?" on":""}">가능</button></div></div>`;
     if(isOk){
+      const timeRow=sk=>`<div class="t3row"><span class="t3q">${slotLabel(sk)} · 몇시부터 가능한가요?</span>`+
+        `<input type="time" step="600" class="t3" data-slot="${sk}" value="${e[sk]||SLOT_DEFAULT[sk]}"><span class="t3after">이후</span></div>`;
       html+=`<div class="slotPanel">`+
         SLOTS.map(s=>`<button class="slot${slots.includes(s.k)?" on":""}" data-k="${s.k}">${s.label}</button>`).join("")+
-        (slots.includes("late3")?`<div class="late3time"><input type="time" step="600" class="l3" value="${e.late3||"21:00"}"> 이후</div>`:"")+
+        TIME_SLOTS.filter(sk=>slots.includes(sk)).map(timeRow).join("")+
         `</div>`;
     }
     item.innerHTML=html;
     item.querySelector(".stbtn.no").onclick=()=> backend.setAvail(me,d.iso, isNo?null:{v:"no"});
     item.querySelector(".stbtn.ok").onclick=()=> backend.setAvail(me,d.iso, isOk?null:{v:"ok",slots:[]});
     if(isOk){
+      const collect=()=>{ const ne={v:"ok",slots}; item.querySelectorAll(".t3").forEach(inp=>ne[inp.dataset.slot]=inp.value); return ne; };
       item.querySelectorAll(".slot").forEach(btn=>btn.onclick=()=>{
         const set=new Set(slots);
         set.has(btn.dataset.k)?set.delete(btn.dataset.k):set.add(btn.dataset.k);
         const ne={v:"ok",slots:[...set]};
-        if(set.has("late3")) ne.late3=e.late3||"21:00";
+        TIME_SLOTS.forEach(sk=>{ if(set.has(sk)) ne[sk]=e[sk]||SLOT_DEFAULT[sk]; });
         backend.setAvail(me,d.iso,ne);
       });
-      const l3=item.querySelector(".l3");
-      if(l3) l3.onchange=()=> backend.setAvail(me,d.iso,{v:"ok",slots,late3:l3.value});
+      item.querySelectorAll(".t3").forEach(inp=>inp.onchange=()=> backend.setAvail(me,d.iso, collect()));
     }
     box.appendChild(item);
   });
@@ -550,12 +556,14 @@ function renderCommonResult(){
       let inter=ALL.slice();
       oks.forEach(x=>{ const s=slotsOf(x.e); const set=s.length?s:ALL; inter=inter.filter(k=>set.includes(k)); });
       if(inter.length){
-        let late3="";
-        if(inter.includes("late3")){
-          const froms=oks.map(x=>x.e.late3).filter(Boolean);
-          if(froms.length) late3=froms.sort().slice(-1)[0]; // 가장 늦은 시작 = 공통
-        }
-        good.push({d, slots:inter, late3});
+        const froms={};
+        TIME_SLOTS.forEach(sk=>{
+          if(inter.includes(sk)){
+            const fs=oks.map(x=>x.e[sk]).filter(Boolean);
+            if(fs.length) froms[sk]=fs.sort().slice(-1)[0]; // 가장 늦은 시작 = 공통
+          }
+        });
+        good.push({d, slots:inter, froms});
       } else mismatch.push({d});
     } else if(oks.length===names.length-1 && blanks.length===1){
       near.push({d, miss:blanks.map(x=>x.n)});
@@ -565,7 +573,7 @@ function renderCommonResult(){
   if(good.length){
     html+='<div style="font-weight:700;margin-bottom:6px;">✅ 다 되는 날</div>'+
       good.map(x=>{
-        const parts=x.slots.map(k=> k==="late3"&&x.late3 ? `늦은 3부(${x.late3} 이후)` : slotLabel(k));
+        const parts=x.slots.map(k=> x.froms[k] ? `${slotLabel(k)}(${x.froms[k]} 이후)` : slotLabel(k));
         return `<div class="pr"><span>${x.d.label}(${x.d.wd})</span><span><b>${parts.join(", ")}</b></span></div>`;
       }).join("");
   } else html+='<div style="color:var(--sub);">아직 다 되는 날이 없어요.</div>';
