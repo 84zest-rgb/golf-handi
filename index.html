@@ -197,13 +197,13 @@
   <!-- ===== 일정 ===== -->
   <section class="screen" id="scr-sched">
     <div class="card">
-      <h2>나 선택</h2>
-      <p class="hint">이 기기에서 입력·투표할 본인을 고르세요. (한 번 고르면 기억됩니다)</p>
+      <h2>당신의 일정을 입력해주세요</h2>
+      <p class="hint">이 기기에서 일정을 입력할 본인을 고르세요. (한 번 고르면 기억됩니다)</p>
       <select id="meSelect"></select>
     </div>
     <div class="card">
-      <h2>내 가능 시간 <span class="badge">앞으로 2주</span></h2>
-      <p class="hint">날짜마다 <b>불가</b> 또는 <b>가능</b>을 고르세요. 가능을 누르면 아래에 시간대(새벽·오전·오후·이른 3부·늦은 3부)가 나옵니다. 언제든 다시 눌러 수정할 수 있습니다.</p>
+      <h2>나의 가능 시간 <span class="badge">앞으로 2주</span></h2>
+      <p class="hint">날짜마다 <b>불가</b> 또는 <b>가능</b>을 고르세요. 가능을 누르면 시간대(하루종일·새벽·오전·오후·이른 3부·늦은 3부)가 나옵니다. ‘하루종일’은 단독 선택, 이른/늦은 3부는 하나만 고를 수 있습니다. 언제든 다시 눌러 수정 가능합니다.</p>
       <div id="myAvail"></div>
     </div>
     <div class="card">
@@ -487,9 +487,10 @@ function renderMeSelect(){
   sel.innerHTML='<option value="">— 본인 선택 —</option>'+
     store.players.map(p=>`<option value="${p.name}"${p.name===me?" selected":""}>${p.name}</option>`).join("");
 }
-const SLOTS=[{k:"dawn",label:"새벽"},{k:"morning",label:"오전"},{k:"afternoon",label:"오후"},{k:"early3",label:"이른 3부"},{k:"late3",label:"늦은 3부"}];
+const SLOTS=[{k:"allday",label:"하루종일"},{k:"dawn",label:"새벽"},{k:"morning",label:"오전"},{k:"afternoon",label:"오후"},{k:"early3",label:"이른 3부"},{k:"late3",label:"늦은 3부"}];
+const REAL_SLOTS=["dawn","morning","afternoon","early3","late3"]; // '하루종일' 제외한 실제 시간대
 const TIME_SLOTS=["early3","late3"];            // '몇시부터' 시간 지정이 붙는 시간대
-const SLOT_DEFAULT={early3:"17:00", late3:"21:00"};
+const SLOT_DEFAULT={early3:"17:00", late3:"18:00"};
 const slotLabel=k=>(SLOTS.find(s=>s.k===k)||{}).label||k;
 const slotsOf=e=>!e||!e.slots?[]:(Array.isArray(e.slots)?e.slots:Object.values(e.slots)); // Firebase 배열 방어
 function renderMyAvail(){
@@ -520,8 +521,15 @@ function renderMyAvail(){
     if(isOk){
       const collect=()=>{ const ne={v:"ok",slots}; item.querySelectorAll(".t3").forEach(inp=>ne[inp.dataset.slot]=inp.value); return ne; };
       item.querySelectorAll(".slot").forEach(btn=>btn.onclick=()=>{
-        const set=new Set(slots);
-        set.has(btn.dataset.k)?set.delete(btn.dataset.k):set.add(btn.dataset.k);
+        const k=btn.dataset.k, set=new Set(slots);
+        if(set.has(k)) set.delete(k);
+        else if(k==="allday"){ set.clear(); set.add("allday"); }   // 하루종일 = 단독 선택
+        else {
+          set.delete("allday");
+          if(k==="early3") set.delete("late3");                    // 이른/늦은 3부는
+          if(k==="late3")  set.delete("early3");                   // 서로 중복 불가
+          set.add(k);
+        }
         const ne={v:"ok",slots:[...set]};
         TIME_SLOTS.forEach(sk=>{ if(set.has(sk)) ne[sk]=e[sk]||SLOT_DEFAULT[sk]; });
         backend.setAvail(me,d.iso,ne);
@@ -545,7 +553,7 @@ function renderCommonResult(){
   const names=[...commonSel];
   if(names.length<2){ box.innerHTML='<div class="empty">2명 이상 선택하세요.</div>'; return; }
   const sched=store.schedule||{};
-  const ALL=SLOTS.map(s=>s.k);
+  const effSlots=e=>{ const s=slotsOf(e); return (!s.length||s.includes("allday"))?REAL_SLOTS:s; }; // 하루종일/미지정=아무때나
   const good=[], mismatch=[], near=[];
   next14().forEach(d=>{
     const ent=names.map(n=>({n, e:(sched[n]&&sched[n][d.iso])||null}));
@@ -553,8 +561,8 @@ function renderCommonResult(){
     const oks=ent.filter(x=>x.e&&x.e.v==="ok");
     const blanks=ent.filter(x=>!x.e);                    // 미입력
     if(oks.length===names.length){
-      let inter=ALL.slice();
-      oks.forEach(x=>{ const s=slotsOf(x.e); const set=s.length?s:ALL; inter=inter.filter(k=>set.includes(k)); });
+      let inter=REAL_SLOTS.slice();
+      oks.forEach(x=>{ const set=effSlots(x.e); inter=inter.filter(k=>set.includes(k)); });
       if(inter.length){
         const froms={};
         TIME_SLOTS.forEach(sk=>{
@@ -573,7 +581,9 @@ function renderCommonResult(){
   if(good.length){
     html+='<div style="font-weight:700;margin-bottom:6px;">✅ 다 되는 날</div>'+
       good.map(x=>{
-        const parts=x.slots.map(k=> x.froms[k] ? `${slotLabel(k)}(${x.froms[k]} 이후)` : slotLabel(k));
+        const parts = x.slots.length===REAL_SLOTS.length
+          ? ["하루종일 (아무때나)"]
+          : x.slots.map(k=> x.froms[k] ? `${slotLabel(k)}(${x.froms[k]} 이후)` : slotLabel(k));
         return `<div class="pr"><span>${x.d.label}(${x.d.wd})</span><span><b>${parts.join(", ")}</b></span></div>`;
       }).join("");
   } else html+='<div style="color:var(--sub);">아직 다 되는 날이 없어요.</div>';
