@@ -157,7 +157,7 @@
   <section class="screen on" id="scr-handi">
     <div class="card">
       <h2>전체 핸디 현황</h2>
-      <p class="hint">등록된 모든 플레이어를 핸디 낮은 순으로 표시합니다. 핸디 = 최근 10경기(최고·최저 제외 8경기) 평균.</p>
+      <p class="hint">등록된 모든 플레이어를 핸디 낮은 순으로 표시합니다. 핸디 = 최근 10경기에서 최고·최저 제외 평균 (10경기 미만도 동일, 2경기 이하는 전체 평균).</p>
       <table>
         <thead><tr><th class="name">이름</th><th>핸디</th><th>경기수</th><th class="name">직전 경기</th><th></th></tr></thead>
         <tbody id="overviewTable"></tbody>
@@ -359,7 +359,8 @@ const clean = n => n.replace(/\*/g,"").trim();
 const byDT = (a,b)=> (a.date+a.time).localeCompare(b.date+b.time);
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1600);}
 
-/* 최근 10경기(최고·최저 제외 8) 평균; 10경기 미만이면 전체 평균.
+/* 최근 10경기에서 최고 1·최저 1 제외한 평균. 10경기 미만도 동일하게 최고·최저 제외.
+   단 2경기 이하는 제외하면 남는 경기가 없어 전체 평균.
    설정 핸디(baseHc)가 있는 플레이어는 5경기 전까지 설정값 사용, 5경기부터 기록 평균으로 전환 */
 function playerAvg(name){
   // 핸디 계산 시 100타 이상은 100으로 상한 처리 (기록·표시는 원본 유지)
@@ -372,7 +373,7 @@ function playerAvg(name){
   if(!gs.length) return null;
   const recent = gs.slice(-10);
   let used = recent;
-  if(recent.length>=10){
+  if(recent.length>=3){                      // 3경기 이상이면 최고1·최저1 제외
     const s=[...recent].sort((a,b)=>a-b);
     used = s.slice(1, s.length-1);
   }
