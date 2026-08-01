@@ -157,7 +157,7 @@
   <section class="screen on" id="scr-handi">
     <div class="card">
       <h2>전체 핸디 현황</h2>
-      <p class="hint">등록된 모든 플레이어를 핸디 낮은 순으로 표시합니다. 핸디 = 최근 10경기에서 최고·최저 제외 평균 (10경기 미만도 동일, 2경기 이하는 전체 평균).</p>
+      <p class="hint">등록된 모든 플레이어를 핸디 낮은 순으로 표시합니다. 핸디 = 최근 12경기에서 최고·최저 제외한 10경기 평균 (12경기 미만도 동일, 2경기 이하는 전체 평균).</p>
       <table>
         <thead><tr><th class="name">이름</th><th>핸디</th><th>경기수</th><th class="name">직전 경기</th><th></th></tr></thead>
         <tbody id="overviewTable"></tbody>
@@ -171,10 +171,10 @@
     <div class="card" id="handiResultCard" style="display:none;">
       <h2>핸디 표 <span class="badge" id="handiBase"></span></h2>
       <table>
-        <thead><tr><th class="name">이름</th><th>경기수</th><th>평균타수</th><th>받는 핸디</th></tr></thead>
+        <thead><tr><th class="name">이름</th><th>경기수</th><th>평균(반올림)</th><th>받는 핸디</th></tr></thead>
         <tbody id="handiTable"></tbody>
       </table>
-      <p class="hint" style="margin-top:10px;">‘받는 핸디’ = 평균이 가장 낮은 사람을 0으로 두고, 평균 차이를 반올림한 타수. 승패는 실제타수−핸디(=net)로 겨룹니다.</p>
+      <p class="hint" style="margin-top:10px;">‘받는 핸디’ = 각자 평균을 반올림한 값끼리의 차이 (최저 평균자 = 0). 예) 88 vs 94 → 6타. 승패는 실제타수−핸디(=net)로 겨룹니다.</p>
     </div>
   </section>
 
@@ -359,7 +359,7 @@ const clean = n => n.replace(/\*/g,"").trim();
 const byDT = (a,b)=> (a.date+a.time).localeCompare(b.date+b.time);
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1600);}
 
-/* 최근 10경기에서 최고 1·최저 1 제외한 평균. 10경기 미만도 동일하게 최고·최저 제외.
+/* 최근 12경기에서 최고 1·최저 1 제외한 10경기 평균. 12경기 미만도 동일하게 최고·최저 제외.
    단 2경기 이하는 제외하면 남는 경기가 없어 전체 평균.
    설정 핸디(baseHc)가 있는 플레이어는 5경기 전까지 설정값 사용, 5경기부터 기록 평균으로 전환 */
 function playerAvg(name){
@@ -371,7 +371,7 @@ function playerAvg(name){
   const baseHc = (p && typeof p.baseHc==="number") ? p.baseHc : null;
   if(baseHc!=null && gs.length<5) return { avg:baseHc, games:gs.length, manual:true };
   if(!gs.length) return null;
-  const recent = gs.slice(-10);
+  const recent = gs.slice(-12);
   let used = recent;
   if(recent.length>=3){                      // 3경기 이상이면 최고1·최저1 제외
     const s=[...recent].sort((a,b)=>a-b);
@@ -380,13 +380,13 @@ function playerAvg(name){
   const avg = used.reduce((a,b)=>a+b,0)/used.length;
   return { avg, games:gs.length, usedGames:used.length };
 }
-/* 그룹 핸디: 최저 평균자=0, 나머지는 (평균차) 내림 정수 */
+/* 그룹 핸디: 각자 평균을 반올림한 값끼리의 차이. 최저(반올림) 평균자=0 */
 function groupHandicaps(names){
   const rows = names.map(n=>({name:n, ...(playerAvg(n)||{avg:null,games:0})}));
   const valid = rows.filter(r=>r.avg!=null);
   if(!valid.length) return rows.map(r=>({...r,hc:0}));
-  const base = Math.min(...valid.map(r=>r.avg));
-  return rows.map(r=>({...r, hc: r.avg==null?0:Math.floor(r.avg-base)}));
+  const base = Math.min(...valid.map(r=>Math.round(r.avg)));
+  return rows.map(r=>({...r, hc: r.avg==null?0:Math.round(r.avg)-base}));
 }
 /* 스코어+핸디로 순위 산출.
    net 동타 시: ① 핸디를 준 사람(핸디 낮은 쪽) 승리
@@ -691,14 +691,14 @@ function renderOverview(){
     const open = overviewOpen.has(r.name);
     tr.innerHTML=`<td class="name">${r.name}</td>`+
       `<td class="hc">${hc}</td>`+
-      `<td>${Math.min(r.games,10)}</td>`+
+      `<td>${Math.min(r.games,12)}</td>`+
       `<td class="name" style="font-weight:400">${last}</td>`+
-      `<td><button class="expbtn${open?" on":""}" title="최근 10경기">${open?"▴":"▾"}</button></td>`;
+      `<td><button class="expbtn${open?" on":""}" title="최근 12경기">${open?"▴":"▾"}</button></td>`;
     tr.querySelector(".expbtn").onclick=()=>{ open?overviewOpen.delete(r.name):overviewOpen.add(r.name); renderOverview(); };
     tb.appendChild(tr);
     if(open){
       const rs=store.rounds.filter(rd=>rd.scores&&typeof rd.scores[r.name]==="number")
-        .sort(byDT).slice(-10).map(rd=>({date:rd.date, score:rd.scores[r.name]}));
+        .sort(byDT).slice(-12).map(rd=>({date:rd.date, score:rd.scores[r.name]}));
       const scores=rs.map(x=>x.score);
       const lo=scores.indexOf(Math.min(...scores)), hi=scores.indexOf(Math.max(...scores));
       const chips=rs.map((x,i)=>{ const cls=i===lo?" lo":(i===hi?" hi":""); return `<div class="g"><small>${fmtMD(x.date)}</small><span class="num${cls}">${x.score}</span></div>`; }).join("");
@@ -746,7 +746,7 @@ function renderHandiResult(){
   rows.forEach(r=>{
     const tr=el("tr");
     tr.innerHTML=`<td class="name">${r.name}</td><td>${r.games||0}</td>`+
-      `<td>${r.avg!=null?r.avg.toFixed(1):"-"}</td>`+
+      `<td>${r.avg!=null?`<b>${Math.round(r.avg)}</b> <small style="color:var(--sub);font-weight:400">(${r.avg.toFixed(1)})</small>`:"-"}</td>`+
       `<td class="hc">${r.avg!=null?"+"+r.hc:"기록없음"}</td>`;
     tb.appendChild(tr);
   });
