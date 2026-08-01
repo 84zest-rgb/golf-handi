@@ -171,10 +171,10 @@
     <div class="card" id="handiResultCard" style="display:none;">
       <h2>핸디 표 <span class="badge" id="handiBase"></span></h2>
       <table>
-        <thead><tr><th class="name">이름</th><th>경기수</th><th>평균(반올림)</th><th>받는 핸디</th></tr></thead>
+        <thead><tr><th class="name">이름</th><th>경기수</th><th>평균타수</th><th>받는 핸디</th></tr></thead>
         <tbody id="handiTable"></tbody>
       </table>
-      <p class="hint" style="margin-top:10px;">‘받는 핸디’ = 각자 평균을 반올림한 값끼리의 차이 (최저 평균자 = 0). 예) 88 vs 94 → 6타. 승패는 실제타수−핸디(=net)로 겨룹니다.</p>
+      <p class="hint" style="margin-top:10px;">‘받는 핸디’ = 평균이 가장 낮은 사람을 0으로 두고, 평균 차이를 내림(버림)한 타수. 승패는 실제타수−핸디(=net)로 겨룹니다.</p>
     </div>
   </section>
 
@@ -380,13 +380,13 @@ function playerAvg(name){
   const avg = used.reduce((a,b)=>a+b,0)/used.length;
   return { avg, games:gs.length, usedGames:used.length };
 }
-/* 그룹 핸디: 각자 평균을 반올림한 값끼리의 차이. 최저(반올림) 평균자=0 */
+/* 그룹 핸디: 최저 평균자=0, 나머지는 (평균차)를 내림(floor)한 타수 */
 function groupHandicaps(names){
   const rows = names.map(n=>({name:n, ...(playerAvg(n)||{avg:null,games:0})}));
   const valid = rows.filter(r=>r.avg!=null);
   if(!valid.length) return rows.map(r=>({...r,hc:0}));
-  const base = Math.min(...valid.map(r=>Math.round(r.avg)));
-  return rows.map(r=>({...r, hc: r.avg==null?0:Math.round(r.avg)-base}));
+  const base = Math.min(...valid.map(r=>r.avg));
+  return rows.map(r=>({...r, hc: r.avg==null?0:Math.floor(r.avg-base)}));
 }
 /* 스코어+핸디로 순위 산출.
    net 동타 시: ① 핸디를 준 사람(핸디 낮은 쪽) 승리
@@ -746,7 +746,7 @@ function renderHandiResult(){
   rows.forEach(r=>{
     const tr=el("tr");
     tr.innerHTML=`<td class="name">${r.name}</td><td>${r.games||0}</td>`+
-      `<td>${r.avg!=null?`<b>${Math.round(r.avg)}</b> <small style="color:var(--sub);font-weight:400">(${r.avg.toFixed(1)})</small>`:"-"}</td>`+
+      `<td>${r.avg!=null?r.avg.toFixed(1):"-"}</td>`+
       `<td class="hc">${r.avg!=null?"+"+r.hc:"기록없음"}</td>`;
     tb.appendChild(tr);
   });
