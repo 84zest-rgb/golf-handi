@@ -409,7 +409,12 @@ async function initBackend(){
   if(USE_CLOUD){
     await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
     await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js");
+    await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js");
     firebase.initializeApp(FIREBASE_CONFIG);
+    // 익명 로그인 — DB 규칙을 auth!=null 로 잠그기 위한 최소 인증 (2026-09-06 Firebase 보안경고 대응).
+    // 콘솔에서 익명 제공업체가 꺼져 있으면 실패하지만, 규칙이 개방 상태인 동안은 그대로 동작한다.
+    try { await firebase.auth().signInAnonymously(); }
+    catch(e){ console.warn("익명 로그인 실패 — 규칙 잠금 전까지는 영향 없음", e); }
     const db = firebase.database();
     const rootRef = db.ref("/");
     let seeded=false;
