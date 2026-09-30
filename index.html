@@ -46,6 +46,21 @@
   .chip.dim{opacity:.4;}
   .chip.sub{border-color:transparent;background:#eef0f5;color:var(--sub);font-weight:500;}
   .chip.sub.on{background:var(--navy);color:#fff;}
+  .settleRank{margin-top:10px;font-size:13.5px;}
+  .srow{display:grid;grid-template-columns:1.1fr 1.2fr 1.3fr auto auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);}
+  .srow input,.srow select{padding:8px 8px;font-size:14px;}
+  .srow .inbet{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--sub);white-space:nowrap;}
+  .srow .inbet input{width:auto;padding:0;}
+  .srow .sdel{background:none;border:none;color:var(--bad);font-size:17px;cursor:pointer;padding:0 2px;}
+  .srow.off input[type=text],.srow.off input[type=number]{color:var(--sub);}
+  .ratioRow{display:flex;gap:8px;}
+  .ratioRow label{flex:1;font-size:12.5px;font-weight:600;color:var(--sub);text-align:center;}
+  .ratioRow input{text-align:center;margin-top:4px;}
+  .swarn{color:var(--bad);font-size:12.5px;font-weight:600;margin:6px 0;}
+  .xfer{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;margin-top:6px;
+    background:#fff7e6;border:1px solid #f3dca6;border-radius:10px;font-size:14.5px;}
+  .xfer b{font-size:15.5px;}
+  td.plus{color:var(--good);font-weight:700;} td.minus{color:var(--bad);font-weight:700;}
   .subdiv{background:#f4f5fa;color:var(--sub);font-weight:700;font-size:12px;text-align:left;
     padding:6px 8px;border-top:1px solid var(--line);}
   .morebtn{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 14px;font-size:12.5px;
@@ -200,6 +215,33 @@
     </div>
   </section>
 
+  <!-- ===== 정산 ===== -->
+  <section class="screen" id="scr-settle">
+    <div class="card">
+      <h2>정산할 경기</h2>
+      <p class="hint">경기입력에서 저장한 경기의 핸디 적용 순위로 비용을 나눕니다.</p>
+      <select id="settleRound"></select>
+      <div id="settleRank" class="settleRank"></div>
+    </div>
+    <div class="card" id="settleItemsCard">
+      <h2>① 비용 · 결제자 · 내기 포함</h2>
+      <p class="hint">금액은 <b>전체 합계</b>로 입력. ‘각자 결제’는 각자 똑같이 나눠 이미 낸 것으로 봅니다. <b>내기</b> 체크를 풀면 그 항목은 인원수로 똑같이 나눕니다.</p>
+      <div id="settleItems"></div>
+      <button class="act ghost" id="settleAddItem" style="margin-top:10px;">+ 항목 추가</button>
+    </div>
+    <div class="card" id="settleRatioCard">
+      <h2>② 내기 비율</h2>
+      <p class="hint">순위별로 내기 포함 비용을 부담하는 비율(%)입니다.</p>
+      <div id="settleRatios" class="ratioRow"></div>
+      <div id="settleRatioSum" class="hint" style="margin:8px 0 0;"></div>
+    </div>
+    <div class="card" id="settleResultCard">
+      <h2>③ 정산 결과</h2>
+      <div id="settleResult"></div>
+      <button class="act" id="settleSave">정산 저장</button>
+    </div>
+  </section>
+
   <!-- ===== 기록 ===== -->
   <section class="screen" id="scr-hist">
     <div class="card">
@@ -276,6 +318,7 @@
 <nav>
   <button class="on" data-scr="handi"><span class="ic">🧮</span>핸디</button>
   <button data-scr="input"><span class="ic">✍️</span>경기입력</button>
+  <button data-scr="settle"><span class="ic">💰</span>정산</button>
   <button data-scr="hist"><span class="ic">🏆</span>기록</button>
   <button data-scr="sched"><span class="ic">📅</span>일정</button>
   <button data-scr="admin"><span class="ic">⚙️</span>관리</button>
@@ -434,6 +477,7 @@ async function initBackend(){
       removePlayer:id=>db.ref("players/"+id).remove(),
       addRound:r=>db.ref("rounds").push(r),
       removeRound:id=>db.ref("rounds/"+id).remove(),
+      setSettle:(id,s)=>db.ref("rounds/"+id+"/settle").set(s),
       // 백업 불러오기/초기화: 일정 브랜치는 건드리지 않고 players·rounds만 교체
       replaceAll:data=>{ db.ref("players").set(data.players||null); db.ref("rounds").set(data.rounds||null); },
       setAvail:(player,date,val)=>val==null?db.ref("schedule/"+player+"/"+date).remove():db.ref("schedule/"+player+"/"+date).set(val)
@@ -464,6 +508,7 @@ async function initBackend(){
       removePlayer:id=>{store.players=store.players.filter(p=>p.id!==id);save();store.emit();},
       addRound:r=>{store.rounds.push({id:uid(),...r});save();store.emit();},
       removeRound:id=>{store.rounds=store.rounds.filter(x=>x.id!==id);save();store.emit();},
+      setSettle:(id,s)=>{const r=store.rounds.find(x=>x.id===id); if(r){r.settle=s;save();store.emit();}},
       replaceAll:d=>{store.players=d.players||[];store.rounds=d.rounds||[];save();store.emit();},
       setAvail:(player,date,val)=>{store.schedule[player]=store.schedule[player]||{};if(val==null)delete store.schedule[player][date];else store.schedule[player][date]=val;save();store.emit();}
     };
@@ -492,7 +537,133 @@ function renderAll(){
   renderHandiChips(); renderHandiResult();
   renderInputChips(); renderCourses(); renderScoreInputs();
   renderStandings(); renderHistory(); renderAdmin(); renderDataInfo();
-  renderSchedule();
+  renderSchedule(); renderSettle();
+}
+
+/* ---------- 정산: 순위 비율로 내기 비용 분담 ---------- */
+const SETTLE_DEFAULT_ITEMS=["그린피","카트비","식사비용","커피","캐디피","기타"];
+const EACH="__each__";   // 결제자 '각자 결제' = 인원수로 나눠 각자 이미 낸 것으로 처리
+let settleRoundId=null, settleUserPicked=false, settleDraft=null, settleOptsKey="";
+const won=n=>Math.round(n).toLocaleString("ko-KR")+"원";
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+const asArr=x=>!x?[]:(Array.isArray(x)?x:Object.values(x));   // Firebase 배열 방어
+function rankedRounds(){
+  return store.rounds.filter(r=>asArr(r.ranking).length>=2).sort(byDT).reverse();
+}
+function settlePlayers(){
+  const r=store.rounds.find(x=>x.id===settleRoundId); return r?asArr(r.ranking):[];
+}
+function loadSettleDraft(r){
+  let ratios=[10,20,30,40];
+  try{ const v=JSON.parse(localStorage.getItem("golfSettleRatios")||"null"); if(Array.isArray(v)&&v.length===4) ratios=v; }catch(e){}
+  const s=r.settle;
+  settleDraft = s
+    ? {roundId:r.id, ratios:asArr(s.ratios).map(Number),
+       items:asArr(s.items).map(i=>({name:i.name||"",amount:i.amount||"",payer:i.payer||"",inBet:i.inBet!==false}))}
+    : {roundId:r.id, ratios, items:SETTLE_DEFAULT_ITEMS.map(n=>({name:n,amount:"",payer:"",inBet:true}))};
+  while(settleDraft.ratios.length<4) settleDraft.ratios.push(0);
+}
+function renderSettle(){
+  const sel=$("#settleRound"); if(!sel) return;
+  const rs=rankedRounds();
+  const cards=["#settleItemsCard","#settleRatioCard","#settleResultCard"].map($);
+  if(!rs.length){
+    sel.innerHTML='<option>순위가 저장된 경기가 없습니다</option>'; $("#settleRank").innerHTML="";
+    cards.forEach(c=>c.style.display="none"); return;
+  }
+  cards.forEach(c=>c.style.display="");
+  if(!settleUserPicked || !rs.some(r=>r.id===settleRoundId)) settleRoundId=rs[0].id;
+  const key=rs.map(r=>r.id+(r.settle?"*":"")).join(",");
+  if(key!==settleOptsKey){
+    settleOptsKey=key;
+    sel.innerHTML=rs.map(r=>`<option value="${r.id}">${fmtMD(r.date)} ${esc(r.course||"")} — ${asArr(r.ranking).map(clean).join(", ")}${r.settle?"  ✓정산":""}</option>`).join("");
+  }
+  sel.value=settleRoundId;
+  const r=rs.find(x=>x.id===settleRoundId);
+  $("#settleRank").innerHTML=asArr(r.ranking).map((n,i)=>`<span class="badge" style="margin:2px 4px 2px 0">${i+1}위 ${clean(n)}</span>`).join("");
+  if(!settleDraft || settleDraft.roundId!==r.id){ loadSettleDraft(r); renderSettleForm(); }
+  renderSettleResult();
+}
+function renderSettleForm(){
+  const players=settlePlayers();
+  const box=$("#settleItems");
+  box.innerHTML='<div class="srow" style="font-size:12px;color:var(--sub);font-weight:600;padding-top:0"><span>항목</span><span>금액(합계)</span><span>결제자</span><span></span><span></span></div>';
+  settleDraft.items.forEach((it,idx)=>{
+    const row=el("div","srow"+(it.inBet?"":" off"));
+    const opts=['<option value="">선택</option>',`<option value="${EACH}">각자 결제</option>`]
+      .concat(players.map(p=>`<option value="${p}">${clean(p)}</option>`)).join("");
+    row.innerHTML=`<input type="text" class="sname" value="${esc(it.name)}" placeholder="항목">`+
+      `<input type="number" inputmode="numeric" class="samt" value="${esc(it.amount)}" placeholder="0">`+
+      `<select class="spayer">${opts}</select>`+
+      `<label class="inbet"><input type="checkbox" class="sbet"${it.inBet?" checked":""}>내기</label>`+
+      `<button class="sdel" title="삭제">×</button>`;
+    row.querySelector(".spayer").value=it.payer;
+    row.querySelector(".sname").oninput=e=>{ it.name=e.target.value; renderSettleResult(); };
+    row.querySelector(".samt").oninput=e=>{ it.amount=e.target.value; renderSettleResult(); };
+    row.querySelector(".spayer").onchange=e=>{ it.payer=e.target.value; renderSettleResult(); };
+    row.querySelector(".sbet").onchange=e=>{ it.inBet=e.target.checked; row.classList.toggle("off",!it.inBet); renderSettleResult(); };
+    row.querySelector(".sdel").onclick=()=>{ settleDraft.items.splice(idx,1); renderSettleForm(); renderSettleResult(); };
+    box.appendChild(row);
+  });
+  const rb=$("#settleRatios"); rb.innerHTML="";
+  players.forEach((p,i)=>{
+    const lab=el("label");
+    lab.innerHTML=`${i+1}위<input type="number" inputmode="numeric" value="${settleDraft.ratios[i]}">`;
+    lab.querySelector("input").oninput=e=>{ settleDraft.ratios[i]=Number(e.target.value)||0; renderSettleResult(); };
+    rb.appendChild(lab);
+  });
+}
+/* 내기 포함 비용 = 순위 비율로 분담, 내기 제외 = 인원수로 균등. 차액으로 최소 송금 목록 산출 */
+function computeSettle(){
+  const players=settlePlayers(), N=players.length;
+  const items=settleDraft.items.map(it=>({...it, amt:Number(it.amount)||0})).filter(it=>it.amt>0);
+  const warns=[], paid=Object.fromEntries(players.map(p=>[p,0]));
+  let betPool=0, nonBet=0;
+  items.forEach(it=>{
+    if(it.payer===EACH) players.forEach(p=>paid[p]+=it.amt/N);
+    else if(it.payer in paid) paid[it.payer]+=it.amt;
+    else warns.push(`‘${it.name||"항목"}’의 결제자를 선택하세요`);
+    if(it.inBet) betPool+=it.amt; else nonBet+=it.amt;
+  });
+  const ratios=players.map((p,i)=>Math.max(0,Number(settleDraft.ratios[i])||0));
+  const R=ratios.reduce((a,b)=>a+b,0);
+  if(betPool>0 && R<=0) warns.push("내기 비율을 입력하세요");
+  const rows=players.map((p,i)=>{
+    const owe=(R>0?betPool*ratios[i]/R:0)+nonBet/N;
+    return {name:p, rank:i+1, ratio:ratios[i], owe, paid:paid[p], bal:paid[p]-owe};
+  });
+  const debt=rows.filter(r=>r.bal<-0.5).map(r=>({n:r.name,v:-r.bal})).sort((a,b)=>b.v-a.v);
+  const cred=rows.filter(r=>r.bal>0.5).map(r=>({n:r.name,v:r.bal})).sort((a,b)=>b.v-a.v);
+  const xfers=[]; let i=0,j=0;
+  while(i<debt.length && j<cred.length){
+    const m=Math.min(debt[i].v,cred[j].v);
+    if(m>=1) xfers.push({from:debt[i].n,to:cred[j].n,amt:m});
+    debt[i].v-=m; cred[j].v-=m;
+    if(debt[i].v<0.5) i++;
+    if(cred[j].v<0.5) j++;
+  }
+  return {items, betPool, nonBet, total:betPool+nonBet, R, rows, xfers, warns};
+}
+function renderSettleResult(){
+  const box=$("#settleResult"); if(!box||!settleDraft) return;
+  const c=computeSettle(), N=c.rows.length;
+  $("#settleRatioSum").innerHTML=`합계 <b>${c.R}%</b>`+
+    (c.R>0&&c.R!==100?` <span style="color:var(--bad)">— 100%가 아니어서 비율대로 환산해 계산합니다</span>`:"");
+  if(!c.items.length){ box.innerHTML='<div class="empty">비용을 입력하면 정산 결과가 나옵니다.</div>'; return; }
+  if(c.warns.length){ box.innerHTML=c.warns.map(w=>`<div class="swarn">⚠ ${esc(w)}</div>`).join(""); return; }
+  box.innerHTML=
+    `<div class="preview" style="margin-top:0">`+
+      `<div class="pr"><span>총 비용</span><b>${won(c.total)}</b></div>`+
+      `<div class="pr"><span>내기 포함 (순위 비율)</span><span>${won(c.betPool)}</span></div>`+
+      (c.nonBet?`<div class="pr"><span>내기 제외 (${N}명 똑같이)</span><span>${won(c.nonBet)}</span></div>`:"")+
+    `</div>`+
+    `<table style="margin-top:12px"><thead><tr><th class="name">순위</th><th>부담액</th><th>낸 금액</th><th>정산</th></tr></thead><tbody>`+
+    c.rows.map(r=>`<tr><td class="name">${r.rank}위 ${clean(r.name)}</td><td>${won(r.owe)}</td><td>${won(r.paid)}</td>`+
+      `<td class="${r.bal>0.5?"plus":r.bal<-0.5?"minus":""}">${r.bal>0.5?"받을 "+won(r.bal):r.bal<-0.5?"보낼 "+won(-r.bal):"0원"}</td></tr>`).join("")+
+    `</tbody></table>`+
+    `<div style="font-weight:700;margin:14px 0 2px;">송금할 내역</div>`+
+    (c.xfers.length ? c.xfers.map(x=>`<div class="xfer"><span>${clean(x.from)} → ${clean(x.to)}</span><b>${won(x.amt)}</b></div>`).join("")
+                    : '<div class="empty">주고받을 금액이 없습니다.</div>');
 }
 
 /* ---------- 일정: 가능시간 + 골프장 투표 ---------- */
@@ -927,6 +1098,27 @@ $("#addPlayer").onclick=()=>{
   inp.value=""; hcInp.value=""; toast("추가했습니다");
 };
 $("#newPlayer").addEventListener("keydown",e=>{if(e.key==="Enter")$("#addPlayer").click();});
+
+/* 정산 탭 핸들러 */
+$("#settleRound").onchange=e=>{ settleRoundId=e.target.value; settleUserPicked=true; renderSettle(); };
+$("#settleAddItem").onclick=()=>{
+  if(!settleDraft) return;
+  settleDraft.items.push({name:"",amount:"",payer:"",inBet:true});
+  renderSettleForm(); renderSettleResult();
+};
+$("#settleSave").onclick=()=>{
+  if(!settleDraft) return;
+  const c=computeSettle();
+  if(!c.items.length){ toast("비용을 먼저 입력하세요"); return; }
+  if(c.warns.length){ toast(c.warns[0]); return; }
+  const ratios=settleDraft.ratios.slice(0,4).map(n=>Number(n)||0);
+  const s={ratios, savedAt:new Date().toISOString(),
+    items:settleDraft.items.filter(it=>Number(it.amount)>0)
+      .map(it=>({name:it.name, amount:Number(it.amount), payer:it.payer, inBet:!!it.inBet}))};
+  try{ localStorage.setItem("golfSettleRatios", JSON.stringify(ratios)); }catch(e){}
+  backend.setSettle(settleRoundId, s);
+  toast("정산을 저장했습니다 ✅");
+};
 
 /* 일정 탭 핸들러 */
 $("#meSelect").onchange=()=>{ setMe($("#meSelect").value); renderSchedule(); };
