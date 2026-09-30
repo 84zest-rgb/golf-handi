@@ -46,6 +46,16 @@
   .chip.dim{opacity:.4;}
   .chip.sub{border-color:transparent;background:#eef0f5;color:var(--sub);font-weight:500;}
   .chip.sub.on{background:var(--navy);color:#fff;}
+  #lock{position:fixed;inset:0;z-index:100;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:20px;}
+  #lock .lockbox{background:#fff;border-radius:18px;padding:30px 24px;width:100%;max-width:320px;text-align:center;}
+  #lock .locklogo{font-size:40px;line-height:1;}
+  #lock .locktitle{font-size:19px;font-weight:800;margin-top:10px;}
+  #lock .locksub{font-size:13.5px;color:var(--sub);margin:6px 0 18px;}
+  #lock input{text-align:center;font-size:26px;letter-spacing:10px;padding:12px;}
+  #lock #pinMsg{color:var(--bad);font-size:13px;font-weight:600;min-height:20px;margin-top:8px;}
+  #lock .act{margin-top:6px;}
+  .shake{animation:shake .35s;}
+  @keyframes shake{0%,100%{transform:none}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
   .settleRank{margin-top:10px;font-size:13.5px;}
   .srow{display:grid;grid-template-columns:1.1fr 1.2fr 1.3fr auto auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);}
   .srow input,.srow select{padding:8px 8px;font-size:14px;}
@@ -157,6 +167,16 @@
 </style>
 </head>
 <body>
+<div id="lock">
+  <div class="lockbox">
+    <div class="locklogo">⛳</div>
+    <div class="locktitle">골프 핸디계산기</div>
+    <div class="locksub">비밀번호를 입력하세요</div>
+    <input type="password" id="pinInput" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="••••">
+    <div id="pinMsg"></div>
+    <button class="act" id="pinBtn">확인</button>
+  </div>
+</div>
 <header>
   <h1>⛳ 골프 핸디계산기</h1>
   <div class="hright">
@@ -676,8 +696,6 @@ function settleText(c){
   const r=store.rounds.find(x=>x.id===settleRoundId);
   const W=["일","월","화","수","목","금","토"], d=new Date(r.date+"T00:00:00");
   const payer=p=>p===EACH?"각자 결제":clean(p);
-  const local=!/^https?:/.test(location.protocol)||/localhost|127\.0\.0\.1/.test(location.host);
-  const url=local?"https://84zest-rgb.github.io/golf-handi/":location.origin+location.pathname;
   const L=[
     `⛳ 골프 정산 · ${d.getMonth()+1}/${d.getDate()}(${W[d.getDay()]}) ${r.course||""}`,
     c.rows.map(x=>`${x.rank}위 ${clean(x.name)}`).join(" · "), "",
@@ -688,8 +706,7 @@ function settleText(c){
     ...c.rows.map(x=>`${x.rank}위 ${clean(x.name)} 부담 ${won(x.owe)} (낸 돈 ${won(x.paid)})`+
       (x.bal>0.5?` → ${won(x.bal)} 받음`:x.bal<-0.5?` → ${won(-x.bal)} 보냄`:" → 정산 없음")), "",
     "[송금할 내역]",
-    ...(c.xfers.length?c.xfers.map(x=>`💸 ${clean(x.from)} → ${clean(x.to)} ${won(x.amt)}`):["주고받을 금액 없음"]), "",
-    `📊 핸디·기록 보기: ${url}`
+    ...(c.xfers.length?c.xfers.map(x=>`💸 ${clean(x.from)} → ${clean(x.to)} ${won(x.amt)}`):["주고받을 금액 없음"])
   ];
   return L.join("\n");
 }
@@ -1246,11 +1263,44 @@ window.addEventListener("error",e=>{
 });
 store.onChange(renderAll);
 setDefaultDate();
-initBackend().catch(err=>{
-  console.error(err);
-  $("#modeTag").textContent="⚠ 연결 오류";
-  toast("클라우드 연결 실패 — 설정을 확인하세요");
-});
+
+/* 비밀번호 잠금 — 맞히기 전에는 DB에 연결하지 않는다. 코드엔 SHA-256 해시만 둔다.
+   한 번 풀면 같은 탭에서는 새로고침해도 유지, 탭·앱을 닫으면 다시 묻는다 */
+const PIN_HASH="de3d43caad2bd3c4f0622fc60deecd06b34a0f25a80e30b81fe051a3c54799bb";
+async function sha256hex(s){
+  const buf=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+let appStarted=false;
+function startApp(){
+  if(appStarted) return; appStarted=true;
+  initBackend().catch(err=>{
+    console.error(err);
+    $("#modeTag").textContent="⚠ 연결 오류";
+    toast("클라우드 연결 실패 — 설정을 확인하세요");
+  });
+}
+const lockEl=$("#lock"), pinEl=$("#pinInput");
+let unlocked=false;
+try{ unlocked=sessionStorage.getItem("golfUnlocked")===PIN_HASH; }catch(e){}
+async function tryPin(){
+  if(await sha256hex(pinEl.value)===PIN_HASH){
+    try{ sessionStorage.setItem("golfUnlocked",PIN_HASH); }catch(e){}
+    lockEl.remove(); startApp();
+  } else {
+    $("#pinMsg").textContent="비밀번호가 틀렸습니다";
+    lockEl.querySelector(".lockbox").classList.remove("shake"); void lockEl.offsetWidth;
+    lockEl.querySelector(".lockbox").classList.add("shake");
+    pinEl.value=""; pinEl.focus();
+  }
+}
+if(unlocked){ lockEl.remove(); startApp(); }
+else {
+  pinEl.focus();
+  pinEl.addEventListener("input",()=>{ $("#pinMsg").textContent=""; if(pinEl.value.length>=4) tryPin(); });
+  pinEl.addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
+  $("#pinBtn").onclick=tryPin;
+}
 </script>
 </body>
 </html>
