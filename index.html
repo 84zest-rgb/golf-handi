@@ -271,7 +271,7 @@
         <thead><tr><th class="name">이름</th><th>경기</th><th>🥇</th><th>🥈</th><th>🥉</th><th>4위</th><th>평균순위</th></tr></thead>
         <tbody id="standTable"></tbody>
       </table>
-      <p class="hint" style="margin-top:8px;">평균순위 = 참가한 경기 순위의 평균 (낮을수록 좋음). 경기 수가 달라도 비교할 수 있습니다.</p>
+      <p class="hint" style="margin-top:8px;">평균순위 = 참가한 경기 순위의 평균 (낮을수록 좋음). 5경기 이상부터 순위에 들어갑니다.</p>
     </div>
     <div class="card">
       <h2 id="histToggle" style="cursor:pointer;margin-bottom:0;">경기 이력 <span class="badge" id="histCount"></span>
@@ -407,12 +407,14 @@ function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show"
    단 2경기 이하는 제외하면 남는 경기가 없어 전체 평균.
    설정 핸디(baseHc)가 있는 플레이어는 5경기 전까지 설정값 사용, 5경기부터 기록 평균으로 전환 */
 function playerAvg(name){
-  // 핸디 계산 시 100타 이상은 100으로 상한 처리 (기록·표시는 원본 유지)
-  const gs = store.rounds
-    .filter(r=>r.scores && typeof r.scores[name]==="number")
-    .sort(byDT).map(r=>Math.min(r.scores[name], 100));
+  // 핸디 계산 시 100타 이상은 100으로 상한 처리 (기록·표시는 원본 유지).
+  // 단 설정 핸디가 100을 넘는 사람은 상한 없이 실제 타수로 계산
   const p = store.players.find(x=>x.name===name);
   const baseHc = (p && typeof p.baseHc==="number") ? p.baseHc : null;
+  const cap = baseHc!=null && baseHc>100 ? Infinity : 100;
+  const gs = store.rounds
+    .filter(r=>r.scores && typeof r.scores[name]==="number")
+    .sort(byDT).map(r=>Math.min(r.scores[name], cap));
   if(baseHc!=null && gs.length<5) return { avg:baseHc, games:gs.length, manual:true };
   if(!gs.length) return null;
   const recent = gs.slice(-12);
@@ -914,11 +916,18 @@ function renderStandings(){
     stat[nm].sum += idx+1;
   }));
   // 평균 순위(낮을수록 좋음) 순. 경기 수가 달라도 비교 가능
-  const rows=Object.entries(stat).sort((a,b)=>a[1].sum/a[1].g-b[1].sum/b[1].g||b[1].g-a[1].g);
+  // 5경기 이상만 순위 대상, 5경기 미만은 아래에 참고로 표시
+  const rows=Object.entries(stat).sort((a,b)=>(a[1].g<5)-(b[1].g<5)||a[1].sum/a[1].g-b[1].sum/b[1].g||b[1].g-a[1].g);
   if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">아직 저장된 경기가 없습니다.</td></tr>';return;}
   tb.innerHTML="";
+  let divided=false;
   rows.forEach(([nm,s])=>{
+    if(s.g<5 && !divided){
+      divided=true;
+      const dv=el("tr"); dv.innerHTML='<td colspan="7" class="subdiv">5경기 미만 (순위 제외 · 참고)</td>'; tb.appendChild(dv);
+    }
     const tr=el("tr");
+    if(s.g<5) tr.style.color="var(--sub)";
     tr.innerHTML=`<td class="name">${nm}</td><td>${s.g}</td>`+
       `<td>${s.p[0]||"·"}</td><td>${s.p[1]||"·"}</td><td>${s.p[2]||"·"}</td><td>${s.p[3]||"·"}</td>`+
       `<td class="hc">${(s.sum/s.g).toFixed(1)}위</td>`;
