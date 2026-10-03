@@ -22,10 +22,6 @@
   header h1{font-size:16px;font-weight:800;margin:0;letter-spacing:-.3px;}
   header .hright{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
   header .mode{font-size:11px;opacity:.85;font-weight:500;}
-  .teebtn{display:inline-flex;align-items:center;gap:5px;background:#00b06b;color:#fff;text-decoration:none;
-    border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;white-space:nowrap;}
-  .teebtn:active{opacity:.85;}
-  .teebtn img{width:15px;height:15px;border-radius:3px;background:#fff;object-fit:contain;}
   main{padding:14px;max-width:560px;margin:0 auto;}
   .screen{display:none;animation:fade .18s;}
   .screen.on{display:block;}
@@ -70,7 +66,9 @@
   .xfer{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;margin-top:6px;
     background:#fff7e6;border:1px solid #f3dca6;border-radius:10px;font-size:14.5px;}
   .xfer b{font-size:15.5px;}
-  td.plus{color:var(--good);font-weight:700;} td.minus{color:var(--bad);font-weight:700;}
+  .orow{padding:7px 2px;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .orow b{display:block;font-size:14px;}
+  .orow span{color:#4a4d5c;}
   .subdiv{background:#f4f5fa;color:var(--sub);font-weight:700;font-size:12px;text-align:left;
     padding:6px 8px;border-top:1px solid var(--line);}
   .morebtn{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 14px;font-size:12.5px;
@@ -180,9 +178,6 @@
 <header>
   <h1>⛳ 골프 핸디계산기</h1>
   <div class="hright">
-    <a class="teebtn" href="https://www.teescanner.com/" target="_blank" rel="noopener" title="티스캐너 골프예약">
-      <img src="https://www.teescanner.com/favicon.ico" alt="" onerror="this.remove()">골프예약 바로가기
-    </a>
     <span class="mode" id="modeTag">…</span>
   </div>
 </header>
@@ -273,34 +268,15 @@
       <h2>누적 승패</h2>
       <p class="hint">핸디를 적용해 저장된 경기의 순위 누적입니다. (앱에서 저장한 경기만 집계)</p>
       <table>
-        <thead><tr><th class="name">이름</th><th>경기</th><th>🥇</th><th>🥈</th><th>🥉</th><th>4위</th><th>승점</th></tr></thead>
+        <thead><tr><th class="name">이름</th><th>경기</th><th>🥇</th><th>🥈</th><th>🥉</th><th>4위</th><th>평균순위</th></tr></thead>
         <tbody id="standTable"></tbody>
       </table>
-      <p class="hint" style="margin-top:8px;">승점: 1위 3점 · 2위 2점 · 3위 1점 · 4위 0점</p>
+      <p class="hint" style="margin-top:8px;">평균순위 = 참가한 경기 순위의 평균 (낮을수록 좋음). 경기 수가 달라도 비교할 수 있습니다.</p>
     </div>
     <div class="card">
-      <h2>경기 이력</h2>
-      <div id="histList"></div>
-    </div>
-  </section>
-
-  <!-- ===== 일정 ===== -->
-  <section class="screen" id="scr-sched">
-    <div class="card">
-      <h2>당신의 일정을 입력해주세요</h2>
-      <p class="hint">이 기기에서 일정을 입력할 본인을 고르세요. (한 번 고르면 기억됩니다)</p>
-      <select id="meSelect"></select>
-    </div>
-    <div class="card">
-      <h2>나의 가능 시간 <span class="badge">앞으로 2주</span></h2>
-      <p class="hint">날짜마다 <b>불가</b> 또는 <b>가능</b>을 고르세요. 가능을 누르면 시간대(하루종일·새벽·오전·오후·이른 3부·늦은 3부)가 나옵니다. ‘하루종일’은 단독 선택, 이른/늦은 3부는 하나만 고를 수 있습니다. 언제든 다시 눌러 수정 가능합니다.</p>
-      <div id="myAvail"></div>
-    </div>
-    <div class="card">
-      <h2>공통 시간 확인</h2>
-      <p class="hint">함께 갈 사람을 고르면 모두 되는 날과 겹치는 시간대를 찾아줍니다.</p>
-      <div class="chips" id="commonChips"></div>
-      <div id="commonResult" style="margin-top:12px;"></div>
+      <h2 id="histToggle" style="cursor:pointer;margin-bottom:0;">경기 이력 <span class="badge" id="histCount"></span>
+        <span id="histCaret" style="margin-left:auto;font-size:12.5px;font-weight:500;color:var(--blue);">▾ 펼치기</span></h2>
+      <div id="histList" style="display:none;margin-top:12px;"></div>
     </div>
   </section>
 
@@ -313,6 +289,7 @@
         <div style="flex:1.4;"><input type="number" id="newPlayerHc" inputmode="numeric" placeholder="핸디(선택)"></div>
         <div><button class="act" style="margin-top:0;" id="addPlayer">추가</button></div>
       </div>
+      <input type="text" id="newPlayerAcct" placeholder="계좌 (선택) 예: 국민은행 123-45-678901" autocomplete="off" style="margin-top:8px;">
       <p class="hint" style="margin-top:8px;">핸디 = 평균 타수(예: 92). 기록이 없는 새 플레이어는 입력한 핸디로 계산하고, <b>5경기가 쌓이면 실제 기록 평균으로 자동 전환</b>됩니다.</p>
       <div class="plist" id="adminPlayers" style="margin-top:14px;"></div>
     </div>
@@ -345,7 +322,6 @@
   <button data-scr="input"><span class="ic">✍️</span>경기입력</button>
   <button data-scr="settle"><span class="ic">💰</span>정산</button>
   <button data-scr="hist"><span class="ic">🏆</span>기록</button>
-  <button data-scr="sched"><span class="ic">📅</span>일정</button>
   <button data-scr="admin"><span class="ic">⚙️</span>관리</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -488,7 +464,7 @@ async function initBackend(){
     let seeded=false;
     rootRef.on("value", snap=>{
       const v = snap.val()||{};
-      store.players = Object.entries(v.players||{}).map(([id,p])=>({id, name:(p&&p.name)||p, baseHc:(p&&typeof p.baseHc==="number")?p.baseHc:null}));
+      store.players = Object.entries(v.players||{}).map(([id,p])=>({id, name:(p&&p.name)||p, baseHc:(p&&typeof p.baseHc==="number")?p.baseHc:null, account:(p&&p.account)||""}));
       store.rounds  = Object.entries(v.rounds||{}).map(([id,r])=>({id, ...r}));
       store.schedule = v.schedule || {};
       store.ready=true;
@@ -498,7 +474,8 @@ async function initBackend(){
       store.emit();
     });
     backend = {
-      addPlayer:(n,hc)=>db.ref("players").push(hc!=null?{name:n,baseHc:hc}:{name:n}),
+      addPlayer:(n,hc,ac)=>{ const o={name:n}; if(hc!=null)o.baseHc=hc; if(ac)o.account=ac; return db.ref("players").push(o); },
+      setAccount:(id,ac)=>db.ref("players/"+id+"/account").set(ac||null),
       removePlayer:id=>db.ref("players/"+id).remove(),
       addRound:r=>db.ref("rounds").push(r),
       removeRound:id=>db.ref("rounds/"+id).remove(),
@@ -529,7 +506,8 @@ async function initBackend(){
     setTimeout(()=>store.emit(),0);
     const uid=()=>Date.now().toString(36)+Math.floor(performance.now()*1000%1e6).toString(36);
     backend = {
-      addPlayer:(n,hc)=>{const p={id:uid(),name:n};if(hc!=null)p.baseHc=hc;store.players.push(p);save();store.emit();},
+      addPlayer:(n,hc,ac)=>{const p={id:uid(),name:n};if(hc!=null)p.baseHc=hc;if(ac)p.account=ac;store.players.push(p);save();store.emit();},
+      setAccount:(id,ac)=>{const p=store.players.find(x=>x.id===id); if(p){p.account=ac||"";save();store.emit();}},
       removePlayer:id=>{store.players=store.players.filter(p=>p.id!==id);save();store.emit();},
       addRound:r=>{store.rounds.push({id:uid(),...r});save();store.emit();},
       removeRound:id=>{store.rounds=store.rounds.filter(x=>x.id!==id);save();store.emit();},
@@ -552,17 +530,14 @@ function seedCloud(db){
 let handiSel = new Set();
 let inputSel = new Set();
 let overviewOpen = new Set();
-let commonSel = new Set();
 let subExpanded = false;
-let avEditMode = false;   // 일정: false=요약(저장됨), true=수정중
-let avModeFor = null;     // avEditMode가 어느 '나'에 대해 설정됐는지
 
 function renderAll(){
   renderOverview();
   renderHandiChips(); renderHandiResult();
   renderInputChips(); renderCourses(); renderScoreInputs();
   renderStandings(); renderHistory(); renderAdmin(); renderDataInfo();
-  renderSchedule(); renderSettle();
+  renderSettle();
 }
 
 /* ---------- 정산: 순위 비율로 내기 비용 분담 ---------- */
@@ -653,9 +628,11 @@ function computeSettle(){
   const ratios=players.map((p,i)=>Math.max(0,Number(settleDraft.ratios[i])||0));
   const R=ratios.reduce((a,b)=>a+b,0);
   if(betPool>0 && R<=0) warns.push("내기 비율을 입력하세요");
+  const nb=items.filter(it=>!it.inBet);
   const rows=players.map((p,i)=>{
-    const owe=(R>0?betPool*ratios[i]/R:0)+nonBet/N;
-    return {name:p, rank:i+1, ratio:ratios[i], owe, paid:paid[p], bal:paid[p]-owe};
+    const bet=R>0?betPool*ratios[i]/R:0, owe=bet+nonBet/N;
+    return {name:p, rank:i+1, ratio:ratios[i], bet, parts:nb.map(it=>({name:it.name||"기타",amt:it.amt/N})),
+            owe, paid:paid[p], bal:paid[p]-owe};
   });
   const debt=rows.filter(r=>r.bal<-0.5).map(r=>({n:r.name,v:-r.bal})).sort((a,b)=>b.v-a.v);
   const cred=rows.filter(r=>r.bal>0.5).map(r=>({n:r.name,v:r.bal})).sort((a,b)=>b.v-a.v);
@@ -682,14 +659,22 @@ function renderSettleResult(){
       `<div class="pr"><span>내기 포함 (순위 비율)</span><span>${won(c.betPool)}</span></div>`+
       (c.nonBet?`<div class="pr"><span>내기 제외 (${N}명 똑같이)</span><span>${won(c.nonBet)}</span></div>`:"")+
     `</div>`+
-    `<table style="margin-top:12px"><thead><tr><th class="name">순위</th><th>부담액</th><th>낸 금액</th><th>정산</th></tr></thead><tbody>`+
-    c.rows.map(r=>`<tr><td class="name">${r.rank}위 ${clean(r.name)}</td><td>${won(r.owe)}</td><td>${won(r.paid)}</td>`+
-      `<td class="${r.bal>0.5?"plus":r.bal<-0.5?"minus":""}">${r.bal>0.5?"받을 "+won(r.bal):r.bal<-0.5?"보낼 "+won(-r.bal):"0원"}</td></tr>`).join("")+
-    `</tbody></table>`+
+    `<div style="font-weight:700;margin:14px 0 2px;">개인별 부담액</div>`+
+    c.rows.map(r=>`<div class="orow"><b>${r.rank}위 ${clean(r.name)}</b><span>${esc(oweLine(r))}</span></div>`).join("")+
     `<div style="font-weight:700;margin:14px 0 2px;">송금할 내역</div>`+
     (c.xfers.length ? c.xfers.map(x=>`<div class="xfer"><span>${clean(x.from)} → ${clean(x.to)}</span><b>${won(x.amt)}</b></div>`).join("")
-                    : '<div class="empty">주고받을 금액이 없습니다.</div>');
+                    : '<div class="empty">주고받을 금액이 없습니다.</div>')+
+    (c.xfers.length ? `<div style="font-weight:700;margin:14px 0 2px;">입금 계좌</div>`+
+      payees(c).map(n=>`<div class="orow"><b>${clean(n)}</b><span>${esc(acctOf(n)||"계좌 미등록 — 관리 탭에서 등록")}</span></div>`).join("") : "");
 }
+/* 개인별 부담 내역 한 줄: 내기 제외 항목(N분의1) + 내기 부담 = 합계 */
+function oweLine(x){
+  const ps=x.parts.map(p=>`${p.name} ${won(p.amt)}`);
+  if(x.bet>0.5) ps.push(`내기 ${won(x.bet)}`);
+  return ps.length>1 ? `${ps.join(" + ")} = ${won(x.owe)}` : (ps[0]||won(0));
+}
+const acctOf=n=>{ const p=store.players.find(x=>x.name===n); return (p&&p.account)||""; };
+const payees=c=>[...new Set(c.xfers.map(x=>x.to))];
 
 /* 카톡에 붙여넣을 정산 전체 내역 텍스트 */
 function settleText(c){
@@ -702,11 +687,11 @@ function settleText(c){
     `[비용] 총 ${won(c.total)}`,
     ...c.items.map(it=>`· ${it.name||"기타"} ${won(it.amt)} (${payer(it.payer)})${it.inBet?"":" · 내기 제외"}`),
     `[내기 비율] ${c.rows.map(x=>`${x.rank}위 ${x.ratio}%`).join(" / ")}`, "",
-    "[부담액]",
-    ...c.rows.map(x=>`${x.rank}위 ${clean(x.name)} 부담 ${won(x.owe)} (낸 돈 ${won(x.paid)})`+
-      (x.bal>0.5?` → ${won(x.bal)} 받음`:x.bal<-0.5?` → ${won(-x.bal)} 보냄`:" → 정산 없음")), "",
+    "[개인별 부담액]",
+    ...c.rows.map(x=>`${x.rank}위 ${clean(x.name)}: ${oweLine(x)}`), "",
     "[송금할 내역]",
-    ...(c.xfers.length?c.xfers.map(x=>`💸 ${clean(x.from)} → ${clean(x.to)} ${won(x.amt)}`):["주고받을 금액 없음"])
+    ...(c.xfers.length?c.xfers.map(x=>`💸 ${clean(x.from)} → ${clean(x.to)} ${won(x.amt)}`):["주고받을 금액 없음"]),
+    ...(c.xfers.length?["", "[입금 계좌]", ...payees(c).map(n=>`${clean(n)} ${acctOf(n)||"(계좌 미등록)"}`)]:[])
   ];
   return L.join("\n");
 }
@@ -732,172 +717,6 @@ async function exportSettle(useShare){
   toast(ok?"복사했습니다 — 카톡에 붙여넣기 하세요":"복사가 안 됩니다 — 화면을 캡처해 주세요");
 }
 
-/* ---------- 일정: 가능시간 + 골프장 투표 ---------- */
-const WD = ["일","월","화","수","목","금","토"];
-function getMe(){ try{ return localStorage.getItem("golfMe")||""; }catch(e){ return window._me||""; } }
-function setMe(v){ try{ localStorage.setItem("golfMe",v); }catch(e){ window._me=v; } }
-function next14(){
-  const out=[], base=new Date(); base.setHours(0,0,0,0);
-  for(let i=0;i<14;i++){
-    const d=new Date(base.getTime()+i*86400000), dow=d.getDay();
-    out.push({
-      iso:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`,
-      label:`${d.getMonth()+1}/${d.getDate()}`, wd:WD[dow], wend:dow===0||dow===6
-    });
-  }
-  return out;
-}
-function renderSchedule(){
-  renderMeSelect(); renderMyAvail(); renderCommonChips(); renderCommonResult();
-}
-function renderMeSelect(){
-  const sel=$("#meSelect"); if(!sel) return;
-  const me=getMe(); const {main,sub}=playerOrder();
-  const opt=p=>`<option value="${p.name}"${p.name===me?" selected":""}>${p.name}</option>`;
-  sel.innerHTML='<option value="">— 본인 선택 —</option>'+main.map(opt).join("")+sub.map(opt).join("");
-}
-const SLOTS=[{k:"allday",label:"하루종일"},{k:"dawn",label:"새벽"},{k:"morning",label:"오전"},{k:"afternoon",label:"오후"},{k:"early3",label:"이른 3부"},{k:"late3",label:"늦은 3부"}];
-const REAL_SLOTS=["dawn","morning","afternoon","early3","late3"]; // '하루종일' 제외한 실제 시간대
-const TIME_SLOTS=["early3","late3"];            // '몇시부터' 시간 지정이 붙는 시간대
-const SLOT_DEFAULT={early3:"17:00", late3:"18:00"};
-const slotLabel=k=>(SLOTS.find(s=>s.k===k)||{}).label||k;
-const slotsOf=e=>!e||!e.slots?[]:(Array.isArray(e.slots)?e.slots:Object.values(e.slots)); // Firebase 배열 방어
-function fmtEntry(e){
-  if(e.v==="no") return '<span style="color:var(--bad);font-weight:700">불가</span>';
-  const s=slotsOf(e), ok='<span style="color:var(--good);font-weight:700">가능</span>';
-  if(!s.length) return ok+' <span style="color:var(--sub)">(시간대 미지정)</span>';
-  if(s.includes("allday")) return ok+' · 하루종일';
-  return ok+' · '+s.map(k=> TIME_SLOTS.includes(k)&&e[k] ? `${slotLabel(k)}(${e[k]} 이후)` : slotLabel(k)).join(", ");
-}
-function renderMyAvail(){
-  const box=$("#myAvail"); if(!box) return;
-  const me=getMe();
-  if(!me){ box.innerHTML='<div class="empty">먼저 위에서 본인을 선택하세요.</div>'; return; }
-  const sched=(store.schedule&&store.schedule[me])||{};
-  const filled=next14().filter(d=>sched[d.iso]);
-  if(me!==avModeFor){ avModeFor=me; avEditMode=(filled.length===0); } // 사람 바뀌면 기록 있으면 요약, 없으면 편집
-  const editing = avEditMode;
-  box.innerHTML="";
-
-  if(!editing){
-    // 요약(저장 완료) 모드
-    box.innerHTML=`<div class="sumHead">✅ 저장됨 · 입력한 날 ${filled.length}일</div>`+
-      filled.map(d=>`<div class="sumRow"><span class="ad${d.wend?" wend":""}">${d.label}<small>(${d.wd})</small></span>`+
-        `<span class="sumval">${fmtEntry(sched[d.iso])}</span></div>`).join("");
-    const eb=el("button","act ghost"); eb.textContent="✎ 수정하기"; eb.style.marginTop="14px";
-    eb.onclick=()=>{ avEditMode=true; renderMyAvail(); };
-    box.appendChild(eb);
-    return;
-  }
-
-  // 편집 모드
-  next14().forEach(d=>{
-    const e=sched[d.iso]||null;
-    const isNo=e&&e.v==="no", isOk=e&&e.v==="ok";
-    const slots=slotsOf(e);
-    const item=el("div","availItem");
-    let html=`<div class="availHead"><span class="ad${d.wend?" wend":""}">${d.label}<small>(${d.wd})</small></span>`+
-      `<div class="stbtns"><button class="stbtn no${isNo?" on":""}">불가</button>`+
-      `<button class="stbtn ok${isOk?" on":""}">가능</button></div></div>`;
-    if(isOk){
-      const timeRow=sk=>`<div class="t3row"><span class="t3q">${slotLabel(sk)} · 몇시부터 가능한가요?</span>`+
-        `<input type="time" step="600" class="t3" data-slot="${sk}" value="${e[sk]||SLOT_DEFAULT[sk]}"><span class="t3after">이후</span></div>`;
-      html+=`<div class="slotPanel">`+
-        SLOTS.map(s=>`<button class="slot${slots.includes(s.k)?" on":""}" data-k="${s.k}">${s.label}</button>`).join("")+
-        TIME_SLOTS.filter(sk=>slots.includes(sk)).map(timeRow).join("")+
-        `</div>`;
-    }
-    item.innerHTML=html;
-    item.querySelector(".stbtn.no").onclick=()=> backend.setAvail(me,d.iso, isNo?null:{v:"no"});
-    item.querySelector(".stbtn.ok").onclick=()=> backend.setAvail(me,d.iso, isOk?null:{v:"ok",slots:[]});
-    if(isOk){
-      const collect=()=>{ const ne={v:"ok",slots}; item.querySelectorAll(".t3").forEach(inp=>ne[inp.dataset.slot]=inp.value); return ne; };
-      item.querySelectorAll(".slot").forEach(btn=>btn.onclick=()=>{
-        const k=btn.dataset.k, set=new Set(slots);
-        if(set.has(k)) set.delete(k);
-        else if(k==="allday"){ set.clear(); set.add("allday"); }   // 하루종일 = 단독 선택
-        else {
-          set.delete("allday");
-          if(k==="early3") set.delete("late3");                    // 이른/늦은 3부는
-          if(k==="late3")  set.delete("early3");                   // 서로 중복 불가
-          set.add(k);
-        }
-        const ne={v:"ok",slots:[...set]};
-        TIME_SLOTS.forEach(sk=>{ if(set.has(sk)) ne[sk]=e[sk]||SLOT_DEFAULT[sk]; });
-        backend.setAvail(me,d.iso,ne);
-      });
-      item.querySelectorAll(".t3").forEach(inp=>inp.onchange=()=> backend.setAvail(me,d.iso, collect()));
-    }
-    box.appendChild(item);
-  });
-  const sb=el("button","act"); sb.textContent="저장하기";
-  sb.onclick=()=>{
-    if(!next14().some(d=>sched[d.iso])){ toast("먼저 날짜별 가능/불가를 선택하세요"); return; }
-    avEditMode=false; toast("일정을 저장했습니다 ✅"); renderMyAvail();
-  };
-  box.appendChild(sb);
-}
-function renderCommonChips(){
-  const box=$("#commonChips"); if(!box) return; box.innerHTML="";
-  const {main,sub}=playerOrder();
-  const add=(p,isSub)=>{
-    const c=el("div","chip"+(isSub?" sub":"")+(commonSel.has(p.name)?" on":""));
-    c.textContent=p.name;
-    c.onclick=()=>{ commonSel.has(p.name)?commonSel.delete(p.name):commonSel.add(p.name); renderCommonChips(); renderCommonResult(); };
-    box.appendChild(c);
-  };
-  main.forEach(p=>add(p,false)); sub.forEach(p=>add(p,true));
-}
-function renderCommonResult(){
-  const box=$("#commonResult"); if(!box) return;
-  const names=[...commonSel];
-  if(names.length<2){ box.innerHTML='<div class="empty">2명 이상 선택하세요.</div>'; return; }
-  const sched=store.schedule||{};
-  const effSlots=e=>{ const s=slotsOf(e); return (!s.length||s.includes("allday"))?REAL_SLOTS:s; }; // 하루종일/미지정=아무때나
-  const good=[], mismatch=[], near=[];
-  next14().forEach(d=>{
-    const ent=names.map(n=>({n, e:(sched[n]&&sched[n][d.iso])||null}));
-    if(ent.some(x=>x.e&&x.e.v==="no")) return;          // 불가한 사람 있으면 제외
-    const oks=ent.filter(x=>x.e&&x.e.v==="ok");
-    const blanks=ent.filter(x=>!x.e);                    // 미입력
-    if(oks.length===names.length){
-      let inter=REAL_SLOTS.slice();
-      oks.forEach(x=>{ const set=effSlots(x.e); inter=inter.filter(k=>set.includes(k)); });
-      if(inter.length){
-        const froms={};
-        TIME_SLOTS.forEach(sk=>{
-          if(inter.includes(sk)){
-            const fs=oks.map(x=>x.e[sk]).filter(Boolean);
-            if(fs.length) froms[sk]=fs.sort().slice(-1)[0]; // 가장 늦은 시작 = 공통
-          }
-        });
-        good.push({d, slots:inter, froms});
-      } else mismatch.push({d});
-    } else if(oks.length===names.length-1 && blanks.length===1){
-      near.push({d, miss:blanks.map(x=>x.n)});
-    }
-  });
-  let html="";
-  if(good.length){
-    html+='<div style="font-weight:700;margin-bottom:6px;">✅ 다 되는 날</div>'+
-      good.map(x=>{
-        const parts = x.slots.length===REAL_SLOTS.length
-          ? ["하루종일 (아무때나)"]
-          : x.slots.map(k=> x.froms[k] ? `${slotLabel(k)}(${x.froms[k]} 이후)` : slotLabel(k));
-        return `<div class="pr"><span>${x.d.label}(${x.d.wd})</span><span><b>${parts.join(", ")}</b></span></div>`;
-      }).join("");
-  } else html+='<div style="color:var(--sub);">아직 다 되는 날이 없어요.</div>';
-  if(mismatch.length){
-    html+='<div style="font-weight:700;margin:12px 0 6px;">⚠️ 날짜는 되나 시간대가 안 겹침</div>'+
-      mismatch.map(x=>`<div class="pr"><span>${x.d.label}(${x.d.wd})</span><span style="color:var(--sub)">시간대 조정 필요</span></div>`).join("");
-  }
-  if(near.length){
-    html+='<div style="font-weight:700;margin:12px 0 6px;">🔸 1명 미입력</div>'+
-      near.map(x=>`<div class="pr"><span>${x.d.label}(${x.d.wd})</span><span style="color:var(--sub)">미입력: ${x.miss.join(", ")}</span></div>`).join("");
-  }
-  box.innerHTML=`<div class="preview">${html}</div>`;
-}
-
 function lastRound(name){
   const rs=store.rounds.filter(r=>r.scores&&typeof r.scores[name]==="number").sort(byDT);
   if(!rs.length) return null;
@@ -907,11 +726,15 @@ function lastRound(name){
 const fmtMD = d => d? d.slice(5).replace("-",".") : "";
 
 /* 주요 멤버(고정 6명) 먼저, 그 다음 서브 멤버. 각 그룹 내부는 핸디 낮은 순 */
-const MAIN_MEMBERS=["김건우","안창달","송영세","손준호","김성수","정종희"];
+const MAIN_MEMBERS=["김건우","안창달","송영세","손준호","김성수","정종희","박건호","전신호"];
 const isMain=name=>MAIN_MEMBERS.includes(name);
-function playerOrder(){
+/* by="games": 경기 수 많은 순(선수 선택 칩) / 기본: 핸디 낮은 순 */
+function playerOrder(by){
   const key=n=>{ const a=playerAvg(n); return a&&a.avg!=null?a.avg:Infinity; };
-  const byKey=(a,b)=>key(a.name)-key(b.name)||a.name.localeCompare(b.name);
+  const games=n=>store.rounds.filter(r=>r.scores&&typeof r.scores[n]==="number").length;
+  const byKey = by==="games"
+    ? (a,b)=>games(b.name)-games(a.name)||a.name.localeCompare(b.name)
+    : (a,b)=>key(a.name)-key(b.name)||a.name.localeCompare(b.name);
   return {
     main: store.players.filter(p=>isMain(p.name)).sort(byKey),
     sub:  store.players.filter(p=>!isMain(p.name)).sort(byKey)
@@ -967,7 +790,7 @@ function renderOverview(){
 
 function renderHandiChips(){
   const box=$("#handiChips"); box.innerHTML="";
-  const {main,sub}=playerOrder();
+  const {main,sub}=playerOrder("games");
   const add=(p,isSub)=>{
     const c=el("div","chip"+(isSub?" sub":"")+(handiSel.has(p.name)?" on":""));
     c.textContent=p.name;
@@ -996,7 +819,7 @@ function renderHandiResult(){
 
 function renderInputChips(){
   const box=$("#inChips"); box.innerHTML="";
-  const {main,sub}=playerOrder();
+  const {main,sub}=playerOrder("games");
   const add=(p,isSub)=>{
     const on=inputSel.has(p.name);
     const full=inputSel.size>=4 && !on;
@@ -1086,24 +909,26 @@ function renderStandings(){
   const rounds=store.rounds.filter(r=>Array.isArray(r.ranking)&&r.ranking.length);
   const stat={};
   rounds.forEach(r=>r.ranking.forEach((nm,idx)=>{
-    stat[nm]=stat[nm]||{g:0,p:[0,0,0,0],pts:0};
+    stat[nm]=stat[nm]||{g:0,p:[0,0,0,0],sum:0};
     stat[nm].g++; if(idx<4)stat[nm].p[idx]++;
-    stat[nm].pts += [3,2,1,0][idx]||0;
+    stat[nm].sum += idx+1;
   }));
-  const rows=Object.entries(stat).sort((a,b)=>b[1].pts-a[1].pts||b[1].p[0]-a[1].p[0]);
+  // 평균 순위(낮을수록 좋음) 순. 경기 수가 달라도 비교 가능
+  const rows=Object.entries(stat).sort((a,b)=>a[1].sum/a[1].g-b[1].sum/b[1].g||b[1].g-a[1].g);
   if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">아직 저장된 경기가 없습니다.</td></tr>';return;}
   tb.innerHTML="";
   rows.forEach(([nm,s])=>{
     const tr=el("tr");
     tr.innerHTML=`<td class="name">${nm}</td><td>${s.g}</td>`+
       `<td>${s.p[0]||"·"}</td><td>${s.p[1]||"·"}</td><td>${s.p[2]||"·"}</td><td>${s.p[3]||"·"}</td>`+
-      `<td class="hc">${s.pts}</td>`;
+      `<td class="hc">${(s.sum/s.g).toFixed(1)}위</td>`;
     tb.appendChild(tr);
   });
 }
 function renderHistory(){
   const box=$("#histList");
   const rounds=[...store.rounds].sort(byDT).reverse();
+  $("#histCount").textContent=rounds.length+"건";
   if(!rounds.length){box.innerHTML='<div class="empty">기록이 없습니다.</div>';return;}
   box.innerHTML="";
   const medal=["🥇","🥈","🥉","4️⃣"];
@@ -1144,12 +969,24 @@ function renderAdmin(){
     const row=el("div","prow");
     const games=store.rounds.filter(r=>r.scores&&typeof r.scores[p.name]==="number").length;
     const hcTag=(typeof p.baseHc==="number")?` · 설정핸디 ${p.baseHc}${games<5?"":"(기록 평균 적용 중)"}`:"";
-    row.innerHTML=`<span><b>${p.name}</b> <span style="color:var(--sub);font-size:12px;">${games}경기${hcTag}</span></span>`;
+    row.innerHTML=`<span><b>${p.name}</b> <span style="color:var(--sub);font-size:12px;">${games}경기${hcTag}</span>`+
+      `<br><span style="color:var(--sub);font-size:12px;">🏦 ${p.account?esc(p.account):"계좌 미등록"}</span></span>`;
+    const btns=el("span"); btns.style.cssText="display:flex;align-items:center;gap:8px;flex:0 0 auto;";
+    const a=el("button","morebtn"); a.textContent="계좌";
+    a.onclick=()=>{
+      const v=prompt(`${p.name} 님 계좌 (예: 국민은행 123-45-678901)\n비우면 삭제됩니다.`, p.account||"");
+      if(v!==null) backend.setAccount(p.id, v.trim());
+    };
     const x=el("button","x"); x.textContent="×";
     x.onclick=()=>{ if(confirm(`${p.name} 님을 명단에서 지울까요? (경기 기록은 유지)`)) backend.removePlayer(p.id); };
-    row.appendChild(x); box.appendChild(row);
+    btns.appendChild(a); btns.appendChild(x); row.appendChild(btns); box.appendChild(row);
   });
 }
+$("#histToggle").onclick=()=>{
+  const l=$("#histList"), open=l.style.display==="none";
+  l.style.display=open?"block":"none";
+  $("#histCaret").textContent=open?"▴ 접기":"▾ 펼치기";
+};
 function renderDataInfo(){
   $("#dataInfo").textContent = (USE_CLOUD?"☁ 클라우드에 동기화 중":"💾 이 기기에만 저장 중")+
     ` · 플레이어 ${store.players.length}명 · 경기 ${store.rounds.length}건`;
@@ -1160,8 +997,8 @@ $("#addPlayer").onclick=()=>{
   const hcInp=$("#newPlayerHc"); const hc=parseFloat(hcInp.value);
   if(!n){toast("이름을 입력하세요");return;}
   if(store.players.some(p=>p.name===n)){toast("이미 등록된 이름");return;}
-  backend.addPlayer(n, isNaN(hc)?null:hc);
-  inp.value=""; hcInp.value=""; toast("추가했습니다");
+  backend.addPlayer(n, isNaN(hc)?null:hc, $("#newPlayerAcct").value.trim());
+  inp.value=""; hcInp.value=""; $("#newPlayerAcct").value=""; toast("추가했습니다");
 };
 $("#newPlayer").addEventListener("keydown",e=>{if(e.key==="Enter")$("#addPlayer").click();});
 
@@ -1189,8 +1026,6 @@ $("#settleSave").onclick=()=>{
 $("#settleCopy").onclick=()=>exportSettle(false);
 $("#settleShare").onclick=()=>exportSettle(true);
 
-/* 일정 탭 핸들러 */
-$("#meSelect").onchange=()=>{ setMe($("#meSelect").value); renderSchedule(); };
 
 $("#exportBtn").onclick=async()=>{
   const now=new Date();
